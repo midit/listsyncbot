@@ -3,6 +3,11 @@
 
 # ListSync Telegram Bot
 
+![](https://img.shields.io/github/repo-size/midit/listsyncbot)
+![](https://img.shields.io/github/last-commit/midit/listsyncbot/main)
+![](https://img.shields.io/github/issues/midit/listsyncbot)
+![](https://img.shields.io/github/issues-closed/midit/listsyncbot)
+
 Telegram bot designed to facilitate collaborative **shopping list** management among **multiple users**. The bot allows users to **create** and **join** sessions, where they can collectively **build** and **update** a list of products they intend to purchase.
 ## Features
 
@@ -22,15 +27,10 @@ Telegram bot designed to facilitate collaborative **shopping list** management a
 7. Close a session with `/close_session` or `/end` command.
 
 
-
-## Contributing
-
-Contributions are always welcome!\
-If you'd like to add new features, fix issues, or improve the code, please open a pull request.
 ## Authors
 
 - [@delovebit](https://www.github.com/midit)
 
-![Status](https://img.shields.io/badge/Version-1.0-green.svg)
-[![Status](https://img.shields.io/badge/Try-on_Telegram-blue.svg)](https://t.me/listsyncbot)
+## License
 
+[GNU General Public License v3.0](https://github.com/midit/SCR_DSHelper/blob/main/LICENSE)
