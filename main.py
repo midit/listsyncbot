@@ -142,7 +142,7 @@ def close_session(update: Update, context: CallbackContext) -> None:
         update.message.reply_text("Ви не знаходитесь у жодній сесії.")
 
 def main() -> None:
-    token = '6396617873:AAFOtCPMRsttr3AOzsagK4tUMQ7JOXQVibc'
+    token = 'TOKEN'
     updater = Updater(token)
     dispatcher = updater.dispatcher
 
