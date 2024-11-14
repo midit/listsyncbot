@@ -4,23 +4,66 @@ import string
 import re
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters
+from telegram.ext.dispatcher import run_async
 
 product_lists = {}
 sessions = {}
+user_languages = {}
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+def set_user_language(user_id, language_code):
+    user_languages[user_id] = language_code
+
+
+def get_user_language(user_id):
+    return user_languages.get(user_id, 'ua')
+
+
+def send_message_in_preferred_language(update, text_ua, text_en):
+    user_id = update.effective_user.id
+    language = get_user_language(user_id)
+    if language == 'ua':
+        update.message.reply_text(text_ua)
+    else:
+        update.message.reply_text(text_en)
+
+
 def start(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text(
+    user_id = update.effective_user.id
+    set_user_language(user_id, 'ua')  # Set default language to Ukrainian
+    send_message_in_preferred_language(
+        update,
         "Вітаю! Використовуйте команду /create_session або /cs, щоб створити нову сесію, "
-        "або /join_session або /js <код_сесії>, щоб приєднатися до сесії.")
+        "або /join_session або /js <код_сесії>, щоб приєднатися до сесії.",
+        "Welcome! Use the /create_session or /cs command to create a new session, "
+        "or /join_session or /js <session_code> to join a session."
+    )
+
+def change_language(update: Update, context: CallbackContext) -> None:
+    user_id = update.effective_user.id
+    args = context.args
+    if len(args) == 1:
+        language_code = args[0].lower()
+        if language_code in ['en', 'ua']:
+            set_user_language(user_id, language_code)
+            if language_code == 'ua':
+                update.message.reply_text("Мова змінена на українську.")
+            else:
+                update.message.reply_text("Language changed to English.")
+        else:
+            update.message.reply_text("Invalid language code. Use /en for English or /ua for Ukrainian.")
+    else:
+        update.message.reply_text("Invalid command format. Use /change_language <language_code>.")
 
 def get_user_session(user_id):
     for session_code, participants in sessions.items():
         if user_id in participants:
             return session_code
     return None
+
 
 def join_session(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
@@ -38,6 +81,7 @@ def join_session(update: Update, context: CallbackContext) -> None:
         update.message.reply_text("Невірний формат команди. "
                                   "Використовуйте команду /join_session або /js <код_сесії>.")
 
+
 def create_session(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     session_code = generate_session_code()
@@ -45,11 +89,13 @@ def create_session(update: Update, context: CallbackContext) -> None:
     update.message.reply_text(
         f"Код вашої сесії: {session_code}\nПодайте цей код іншому користувачу, щоб приєднатися до сесії.")
 
+
 def generate_session_code() -> str:
     while True:
         session_code = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
         if session_code not in sessions:
             return session_code
+
 
 def handle_message(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
@@ -59,7 +105,7 @@ def handle_message(update: Update, context: CallbackContext) -> None:
     session_code = get_user_session(user_id)
     session_users = sessions.get(session_code, [])
 
-    if re.match(r'^\s*-\d+(?:,-\d+)*\s*$', message_text):
+    if re.match(r'^-\d+(?:,\s?-\d+)*$', message_text):
         product_indices = [int(index) for index in message_text.replace('-', '').split(',')]
 
         if session_code and session_code in product_lists:
@@ -92,9 +138,11 @@ def handle_message(update: Update, context: CallbackContext) -> None:
     else:
         product_list = []
         for line in lines:
-            parts = line.split()
-            if len(parts) == 2 and parts[1].isdigit():
-                product_list.append((parts[0], parts[1]))
+            match = re.match(r'^(.+?)(?: (\d+) ?)?$', line)
+            if match:
+                product_name, quantity_str = match.groups()
+                quantity = int(quantity_str) if quantity_str else 1
+                product_list.append((product_name, quantity))
 
         if product_list:
             session_code = get_user_session(user_id)
@@ -103,7 +151,8 @@ def handle_message(update: Update, context: CallbackContext) -> None:
                 for uid in session_users:
                     context.bot.send_message(uid, "До списку продуктів були додані нові позиції.")
                     products = product_lists[session_code]
-                    products_text = "\n".join([f"{index + 1}. {product} {quantity}" for index, (product, quantity) in enumerate(products)])
+                    products_text = "\n".join(
+                        [f"{index + 1}. {product} {quantity}" for index, (product, quantity) in enumerate(products)])
                     context.bot.send_message(uid, f"Список продуктів:\n{products_text}")
             else:
                 update.message.reply_text("Ви не знаходитесь у жодній сесії.")
@@ -118,12 +167,14 @@ def show_product_list(update: Update, context: CallbackContext) -> None:
     if session_code in product_lists:
         products = product_lists[session_code]
         if products:
-            products_text = "\n".join([f"{index+1}. {product} {quantity}" for index, (product, quantity) in enumerate(products)])
+            products_text = "\n".join(
+                [f"{index + 1}. {product} {quantity}" for index, (product, quantity) in enumerate(products)])
             update.message.reply_text(f"Список продуктів:\n{products_text}")
         else:
             update.message.reply_text("Список продуктів порожній.")
     else:
         update.message.reply_text("Ви не знаходитесь у жодній сесії або ви ще не створили список продуктів.")
+
 
 def close_session(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
@@ -141,8 +192,9 @@ def close_session(update: Update, context: CallbackContext) -> None:
     else:
         update.message.reply_text("Ви не знаходитесь у жодній сесії.")
 
+
 def main() -> None:
-    token = 'TOKEN'
+    token = 'YOUR_TOKEN'
     updater = Updater(token)
     dispatcher = updater.dispatcher
 
@@ -154,12 +206,14 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler('close_session', close_session))
     dispatcher.add_handler(CommandHandler('end', close_session))
     dispatcher.add_handler(CommandHandler('list', show_product_list))
+    dispatcher.add_handler(CommandHandler('lang', change_language))
     dispatcher.add_handler(MessageHandler(Filters.regex(re.compile(r'\bсписок\b', re.IGNORECASE)), show_product_list))
     dispatcher.add_handler(MessageHandler(Filters.regex(re.compile(r'\bс\b', re.IGNORECASE)), show_product_list))
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
 
     updater.start_polling()
     updater.idle()
+
 
 if __name__ == '__main__':
     main()
